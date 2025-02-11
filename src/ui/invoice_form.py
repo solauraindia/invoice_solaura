@@ -1,7 +1,7 @@
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QFormLayout,
                              QLabel, QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox,
                              QPushButton, QFrame, QCheckBox, QScrollArea, QGroupBox,
-                             QMessageBox, QTextBrowser)
+                             QMessageBox, QTextBrowser, QSizePolicy)
 from PyQt5.QtCore import Qt
 from ..database.query import (get_all_sellers_data, get_devices_by_pan, 
                            get_invoice_data, get_registered_devices,
@@ -144,21 +144,31 @@ class InvoiceForm(QWidget):
         # Preview layout (right side)
         preview_container = QWidget()
         preview_layout = QVBoxLayout()
+        preview_layout.setContentsMargins(0, 0, 0, 0)  # Remove margins
         
-        preview_label = QLabel('Invoice Preview')
+        preview_label = QLabel('Worksheet Calculations')
         preview_label.setAlignment(Qt.AlignCenter)
         preview_layout.addWidget(preview_label)
         
-        # Create text browser for preview
+        # Create text browser for preview with expanded width
         self.preview_text = QTextBrowser()
-        self.preview_text.setMinimumWidth(400)
+        self.preview_text.setMinimumWidth(500)  # Increased minimum width
+        self.preview_text.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)  # Allow expanding
+        self.preview_text.setStyleSheet("""
+            QTextBrowser {
+                background-color: white;
+                padding: 0px;
+                margin: 0px;
+                border: none;
+            }
+        """)
         preview_layout.addWidget(self.preview_text)
         
         preview_container.setLayout(preview_layout)
         
-        # Add both containers to main layout
-        main_layout.addWidget(form_container)
-        main_layout.addWidget(preview_container)
+        # Add both containers to main layout with stretch factor
+        main_layout.addWidget(form_container, 1)  # 1 part
+        main_layout.addWidget(preview_container, 1)  # 1 part
         
         self.setLayout(main_layout)
 
@@ -614,36 +624,132 @@ class InvoiceForm(QWidget):
         if not invoice_data:
             return
             
-        # Format the preview text
+        # Format the preview text with a single HTML table
         preview_text = []
-        preview_text.append("<h3>Invoice Calculations</h3>")
+        preview_text.append("""
+        <style>
+            body {
+                margin: 0;
+                padding: 0;
+            }
+            table {
+                width: 100%;
+                margin: 0;
+                border-collapse: collapse;
+                table-layout: fixed;
+            }
+            th, td {
+                padding: 8px;
+                border: 1px solid #ddd;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+            th {
+                background-color: #f0f0f0;
+                font-weight: bold;
+                text-align: center;
+            }
+            td:first-child {
+                width: 65%;
+                text-align: left;
+                padding-left: 15px;
+            }
+            td:last-child {
+                width: 35%;
+                text-align: right;
+                padding-right: 15px;
+            }
+            h3 {
+                text-align: center;
+                margin: 10px 0 20px 0;
+                padding: 0;
+            }
+        </style>
+        <h3>Worksheet Calculations</h3>
+        """)
         
-        # Device Information
-        preview_text.append("<p><b>Device Information:</b></p>")
-        preview_text.append(f"Total Devices: {calculations['total_devices']}")
-        preview_text.append(f"Total Capacity: {calculations['capacity']:.2f} MW")
-        preview_text.append(f"Total Issued: {calculations['total_issued']:.4f}")
-        preview_text.append("<br>")
+        # Single comprehensive table
+        preview_text.append("""
+        <table>
+            <tr>
+                <th colspan='2'>Device Information</th>
+            </tr>
+            <tr>
+                <td>Total Devices</td>
+                <td>{}</td>
+            </tr>
+            <tr>
+                <td>Total Capacity</td>
+                <td>{:.2f} MW</td>
+            </tr>
+            <tr>
+                <td>Total Issued</td>
+                <td>{:.4f}</td>
+            </tr>
+            
+            <tr>
+                <th colspan='2'>Fees</th>
+            </tr>
+            <tr>
+                <td>Registration Fee (EUR)</td>
+                <td>{:.2f}</td>
+            </tr>
+            <tr>
+                <td>Registration Fee (INR)</td>
+                <td>{:.4f}</td>
+            </tr>
+            <tr>
+                <td>Issuance Fee (EUR)</td>
+                <td>{:.4f}</td>
+            </tr>
+            <tr>
+                <td>Issuance Fee (INR)</td>
+                <td>{:.4f}</td>
+            </tr>
+            
+            <tr>
+                <th colspan='2'>Revenue Calculation</th>
+            </tr>
+            <tr>
+                <td>Gross Amount (INR)</td>
+                <td>{:.4f}</td>
+            </tr>
+            <tr>
+                <td>Net Revenue (INR)</td>
+                <td>{:.4f}</td>
+            </tr>
+            <tr>
+                <td>Success Fee (INR)</td>
+                <td>{:.4f}</td>
+            </tr>
+            <tr>
+                <td>Final Revenue (INR)</td>
+                <td>{:.4f}</td>
+            </tr>
+            
+            <tr>
+                <th colspan='2'>Final Rate</th>
+            </tr>
+            <tr>
+                <td>Net Rate</td>
+                <td>{:.4f}</td>
+            </tr>
+        </table>
+        """.format(
+            calculations['total_devices'],
+            calculations['capacity'],
+            calculations['total_issued'],
+            calculations['registration_fee'],
+            calculations['reg_fee_inr'],
+            calculations['issuance_fee'],
+            calculations['issuance_fee_inr'],
+            calculations['gross_amount'],
+            calculations['net_revenue'],
+            calculations['success_fee'],
+            calculations['final_revenue'],
+            calculations['net_rate']
+        ))
         
-        # Fees Calculation
-        preview_text.append("<p><b>Fees:</b></p>")
-        preview_text.append(f"Registration Fee (EUR): {calculations['registration_fee']:.2f}")
-        preview_text.append(f"Registration Fee (INR): {calculations['reg_fee_inr']:.4f}")
-        preview_text.append(f"Issuance Fee (EUR): {calculations['issuance_fee']:.4f}")
-        preview_text.append(f"Issuance Fee (INR): {calculations['issuance_fee_inr']:.4f}")
-        preview_text.append("<br>")
-        
-        # Revenue Calculation
-        preview_text.append("<p><b>Revenue Calculation:</b></p>")
-        preview_text.append(f"Gross Amount (INR): {calculations['gross_amount']:.4f}")
-        preview_text.append(f"Net Revenue (INR): {calculations['net_revenue']:.4f}")
-        preview_text.append(f"Success Fee (INR): {calculations['success_fee']:.4f}")
-        preview_text.append(f"Final Revenue (INR): {calculations['final_revenue']:.4f}")
-        preview_text.append("<br>")
-        
-        # Final Rate
-        preview_text.append("<p><b>Final Rate:</b></p>")
-        preview_text.append(f"Net Rate: {calculations['net_rate']:.4f}")
-        
-        # Join all text with line breaks and set to preview
+        # Set the HTML content
         self.preview_text.setHtml("\n".join(preview_text)) 
