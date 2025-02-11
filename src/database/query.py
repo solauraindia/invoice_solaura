@@ -156,24 +156,3 @@ def register_devices(device_ids):
             db.execute(query, {"device_id": device_id.strip()})
         
         db.commit()
-
-def update_invoice_status(device_ids, year, period_from, period_to):
-    """Update invoice_status to True for the processed records"""
-    with next(get_db()) as db:
-        months = get_months_between(period_from, period_to)
-        
-        query = text("""
-            UPDATE inventory2
-            SET invoice_status = 'False'
-            WHERE `Device ID` IN :device_ids
-            AND Year = :year
-            AND LOWER(Month) IN :months
-        """)
-        
-        db.execute(query, {
-            "device_ids": tuple(device_ids),
-            "year": year,
-            "months": tuple(months)
-        })
-        
-        db.commit()

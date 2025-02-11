@@ -5,8 +5,7 @@ from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QFormLayout,
 from PyQt5.QtCore import Qt
 from ..database.query import (get_all_sellers_data, get_devices_by_pan, 
                            get_invoice_data, get_registered_devices,
-                           insert_invoice_data, register_devices,
-                           update_invoice_status)
+                           insert_invoice_data, register_devices)
 from ..calculations.invoice_calculator import InvoiceCalculator
 from ..utils.excel_handler import ExcelInvoiceGenerator
 import logging
@@ -438,9 +437,6 @@ class InvoiceForm(QWidget):
                 
                 # Register devices
                 register_devices(device_ids)
-                
-                # Update invoice status
-                update_invoice_status(device_ids, selected_year, period_from, period_to)
                 
                 logger.info("Successfully inserted invoice data and registered devices")
             except Exception as e:
