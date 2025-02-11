@@ -5,7 +5,7 @@ from .db_connection import get_db
 def get_all_sellers_data():
     with next(get_db()) as db:
         query = text("""
-            SELECT `group`, seller, success_fee, indicative_price
+            SELECT `group`, seller, success_fee, indicative_price, gst, pan, address
             FROM sellers
             ORDER BY `group`, seller
         """)
@@ -17,7 +17,10 @@ def get_all_sellers_data():
             seller_info = {
                 "seller": row[1],
                 "success_fee": row[2],
-                "indicative_price": row[3]
+                "indicative_price": row[3],
+                "gst": row[4],
+                "pan": row[5],
+                "address": row[6]
             }
 
             if group not in sellers_data:
@@ -37,21 +40,6 @@ def get_devices_by_pan(pan):
         """)
         result = db.execute(query, {"pan": pan})
         return [row[0] for row in result]
-
-def get_seller_pan(company_name, group_name):
-    """Get PAN number for a given company and group"""
-    with next(get_db()) as db:
-        query = text("""
-            SELECT pan
-            FROM sellers
-            WHERE seller = :company_name AND `group` = :group_name
-        """)
-        result = db.execute(query, {
-            "company_name": company_name,
-            "group_name": group_name
-        })
-        row = result.fetchone()
-        return row[0] if row else None
 
 def get_months_between(from_month, to_month):
     """Get list of months between two months inclusive"""

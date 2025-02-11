@@ -1,4 +1,8 @@
 PyQt5==5.15.9
 SQLAlchemy==2.0.25
 pymysql==1.1.0
-python-dotenv==1.0.0 
+python-dotenv==1.0.0
+reportlab==4.0.8
+cryptography==41.0.7  # Required for secure MySQL connections
+PyMySQL[rsa]==1.1.0  # For MySQL with SSL support
+openpyxl==3.1.2  # For Excel handling
