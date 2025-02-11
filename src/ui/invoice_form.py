@@ -327,23 +327,20 @@ class InvoiceForm(QWidget):
                 QMessageBox.warning(self, "Warning", "Please generate invoice data first.")
                 return
                 
-            # Get company name for directory
+            # Get company and group names for directory
             company_name = self.company_name_combo.currentText()
+            group_name = self.group_name_combo.currentText()
+            year = self.year_combo.currentText()
             
-            # Create base Invoice directory if it doesn't exist
-            invoice_base_dir = os.path.join(os.getcwd(), "Invoices")
-            if not os.path.exists(invoice_base_dir):
-                os.makedirs(invoice_base_dir)
-            
-            # Create company-specific directory
-            company_dir = os.path.join(invoice_base_dir, company_name)
-            if not os.path.exists(company_dir):
-                os.makedirs(company_dir)
+            # Create directory structure for Worksheet
+            worksheet_base_dir = os.path.join(os.getcwd(), "Worksheet", group_name, company_name, year)
+            if not os.path.exists(worksheet_base_dir):
+                os.makedirs(worksheet_base_dir)
                 
             # Save file in company-specific directory
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             filename = f"invoice_worksheet_{timestamp}.pdf"
-            filepath = os.path.join(company_dir, filename)
+            filepath = os.path.join(worksheet_base_dir, filename)
             
             self.generate_worksheet_pdf(filepath)
             
@@ -368,10 +365,16 @@ class InvoiceForm(QWidget):
                 QMessageBox.warning(self, "Warning", "Please generate invoice data first.")
                 return
 
-            # Get company details from the current selection
+            # Get company and group names for directory
             group_name = self.group_name_combo.currentText()
             company_name = self.company_name_combo.currentText()
+            selected_year = self.year_combo.currentText()
             
+            # Create directory structure for Invoices
+            invoice_base_dir = os.path.join(os.getcwd(), "Invoices", group_name, company_name, selected_year)
+            if not os.path.exists(invoice_base_dir):
+                os.makedirs(invoice_base_dir)
+
             # Get seller details directly from sellers_data
             seller_info = next(
                 seller for seller in self.sellers_data[group_name] 
@@ -460,23 +463,13 @@ class InvoiceForm(QWidget):
                 'year': selected_year
             }
 
-            # Create base Invoice directory if it doesn't exist
-            invoice_base_dir = os.path.join(os.getcwd(), "Invoices")
-            if not os.path.exists(invoice_base_dir):
-                os.makedirs(invoice_base_dir)
-            
-            # Create company-specific directory
-            company_dir = os.path.join(invoice_base_dir, company_name)
-            if not os.path.exists(company_dir):
-                os.makedirs(company_dir)
-
             # Initialize Excel generator with template
             template_path = os.path.join(os.getcwd(), "src", "public", "template.xlsx")
             excel_generator = ExcelInvoiceGenerator(template_path)
 
             # Generate Excel invoice
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            output_path = os.path.join(company_dir, f"invoice_{timestamp}.xlsx")
+            output_path = os.path.join(invoice_base_dir, f"invoice_{timestamp}.xlsx")
             
             excel_generator.generate_invoice(excel_data, self.current_calculations)
             excel_generator.save(output_path)
