@@ -1,9 +1,11 @@
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QFormLayout,
                              QLabel, QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox,
                              QPushButton, QFrame, QCheckBox, QScrollArea, QGroupBox,
-                             QMessageBox, QTableWidget, QTableWidgetItem, QHeaderView)
+                             QMessageBox, QTextBrowser)
 from PyQt5.QtCore import Qt
-from ..database.query import get_all_sellers_data, get_devices_by_pan, get_seller_pan, get_invoice_data
+from ..database.query import (get_all_sellers_data, get_devices_by_pan, get_seller_pan, 
+                           get_invoice_data, get_registered_devices)
+from ..calculations.invoice_calculator import InvoiceCalculator
 import logging
 
 # Set up logging
@@ -118,12 +120,10 @@ class InvoiceForm(QWidget):
         preview_label.setAlignment(Qt.AlignCenter)
         preview_layout.addWidget(preview_label)
         
-        # Create table for preview
-        self.preview_table = QTableWidget()
-        self.preview_table.setColumnCount(0)
-        self.preview_table.setRowCount(0)
-        self.preview_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
-        preview_layout.addWidget(self.preview_table)
+        # Create text browser for preview
+        self.preview_text = QTextBrowser()
+        self.preview_text.setMinimumWidth(400)
+        preview_layout.addWidget(self.preview_text)
         
         preview_container.setLayout(preview_layout)
         
@@ -231,6 +231,10 @@ class InvoiceForm(QWidget):
             year = int(self.year_combo.currentText())
             period_from = self.period_from_combo.currentText()
             period_to = self.period_to_combo.currentText()
+            unit_price = self.unit_price_spin.value()
+            success_fee = self.success_fee_spin.value()
+            usd_rate = self.usd_rate_spin.value()
+            eur_rate = self.eur_rate_spin.value()
             
             # Get invoice data
             invoice_data = get_invoice_data(
@@ -247,9 +251,23 @@ class InvoiceForm(QWidget):
                     "No invoice data found for the selected devices and period."
                 )
                 return
+
+            # Get registered devices
+            device_ids = ','.join(d['Device ID'] for d in invoice_data)
+            registered_devices = get_registered_devices(device_ids)
+            
+            # Calculate invoice amounts
+            calculations = InvoiceCalculator.calculate_invoice_amounts(
+                invoice_data,
+                registered_devices,
+                unit_price,
+                success_fee,
+                usd_rate,
+                eur_rate
+            )
                 
             logger.info(f"Retrieved invoice data for {len(invoice_data)} devices")
-            self.display_invoice_data(invoice_data)
+            self.display_invoice_data(invoice_data, calculations)
             
         except Exception as e:
             logger.error(f"Error generating invoice: {str(e)}")
@@ -259,31 +277,52 @@ class InvoiceForm(QWidget):
                 f"Failed to generate invoice: {str(e)}"
             )
 
-    def display_invoice_data(self, invoice_data):
-        """Display invoice data in the preview table"""
+    def display_invoice_data(self, invoice_data, calculations):
+        """Display invoice calculations in the preview"""
         if not invoice_data:
             return
             
-        # Get all columns from the first row
-        columns = list(invoice_data[0].keys())
+        # Format the preview text
+        preview_text = []
+        preview_text.append("<h3>Invoice Calculations</h3>")
         
-        # Set up table
-        self.preview_table.setRowCount(len(invoice_data))
-        self.preview_table.setColumnCount(len(columns))
-        self.preview_table.setHorizontalHeaderLabels(columns)
+        # Device Information
+        preview_text.append("<p><b>Device Information:</b></p>")
+        preview_text.append(f"Total Devices: {calculations['total_devices']}")
+        preview_text.append(f"Total Capacity: {calculations['capacity']:.2f} MW")
+        preview_text.append(f"Total Issued: {calculations['total_issued']:.4f}")
+        preview_text.append("<br>")
         
-        # Populate table
-        for row_idx, row_data in enumerate(invoice_data):
-            for col_idx, column in enumerate(columns):
-                value = row_data.get(column, '')
-                # Format decimal numbers to 4 decimal places if applicable
-                if isinstance(value, (float, int)):
-                    item = QTableWidgetItem(f"{value:.4f}")
-                else:
-                    item = QTableWidgetItem(str(value))
-                item.setTextAlignment(Qt.AlignRight if isinstance(value, (float, int)) else Qt.AlignLeft)
-                self.preview_table.setItem(row_idx, col_idx, item)
+        # Fees Calculation
+        preview_text.append("<p><b>Fees:</b></p>")
+        preview_text.append(f"Registration Fee (EUR): {calculations['registration_fee']:.2f}")
+        preview_text.append(f"Registration Fee (INR): {calculations['reg_fee_inr']:.4f}")
+        preview_text.append(f"Issuance Fee (EUR): {calculations['issuance_fee']:.4f}")
+        preview_text.append(f"Issuance Fee (INR): {calculations['issuance_fee_inr']:.4f}")
+        preview_text.append("<br>")
         
-        # Adjust table appearance
-        self.preview_table.resizeColumnsToContents()
-        self.preview_table.resizeRowsToContents() 
+        # Revenue Calculation
+        preview_text.append("<p><b>Revenue Calculation:</b></p>")
+        preview_text.append(f"Gross Amount (INR): {calculations['gross_amount']:.4f}")
+        preview_text.append(f"Net Revenue (INR): {calculations['net_revenue']:.4f}")
+        preview_text.append(f"Success Fee (INR): {calculations['success_fee']:.4f}")
+        preview_text.append(f"Final Revenue (INR): {calculations['final_revenue']:.4f}")
+        preview_text.append("<br>")
+        
+        # Final Rate
+        preview_text.append("<p><b>Final Rate:</b></p>")
+        preview_text.append(f"Net Rate: {calculations['net_rate']:.4f}")
+        
+        # Device Details
+        preview_text.append("<br><p><b>Device Details:</b></p>")
+        for device in invoice_data:
+            preview_text.append(
+                f"Device ID: {device['Device ID']}<br>"
+                f"Project: {device['Project']}<br>"
+                f"Capacity: {device['Capacity']:.2f} MW<br>"
+                f"Total Issued: {device['TotalIssued']:.4f}<br>"
+                "-------------------"
+            )
+        
+        # Join all text with line breaks and set to preview
+        self.preview_text.setHtml("<br>".join(preview_text)) 

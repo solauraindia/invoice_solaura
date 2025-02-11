@@ -112,3 +112,19 @@ def get_invoice_data(device_ids, year, period_from, period_to):
         # Convert result to list of dictionaries
         columns = result.keys()
         return [dict(zip(columns, row)) for row in result]
+
+def get_registered_devices(device_ids):
+    """Get list of registered device IDs from invoicereg table"""
+    with next(get_db()) as db:
+        # Convert comma-separated string to list if needed
+        if isinstance(device_ids, str):
+            device_ids = device_ids.split(',')
+            
+        query = text("""
+            SELECT `Device ID`
+            FROM invoicereg
+            WHERE `Device ID` IN :device_ids
+        """)
+        
+        result = db.execute(query, {"device_ids": tuple(device_ids)})
+        return ','.join(row[0] for row in result)
