@@ -328,15 +328,23 @@ class InvoiceForm(QWidget):
                 QMessageBox.warning(self, "Warning", "Please generate invoice data first.")
                 return
                 
-            # Create Invoice directory if it doesn't exist
-            invoice_dir = os.path.join(os.getcwd(), "Invoice")
-            if not os.path.exists(invoice_dir):
-                os.makedirs(invoice_dir)
+            # Get company name for directory
+            company_name = self.company_name_combo.currentText()
+            
+            # Create base Invoice directory if it doesn't exist
+            invoice_base_dir = os.path.join(os.getcwd(), "Invoices")
+            if not os.path.exists(invoice_base_dir):
+                os.makedirs(invoice_base_dir)
+            
+            # Create company-specific directory
+            company_dir = os.path.join(invoice_base_dir, company_name)
+            if not os.path.exists(company_dir):
+                os.makedirs(company_dir)
                 
-            # Save file in Invoice directory
+            # Save file in company-specific directory
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             filename = f"invoice_worksheet_{timestamp}.pdf"
-            filepath = os.path.join(invoice_dir, filename)
+            filepath = os.path.join(company_dir, filename)
             
             self.generate_worksheet_pdf(filepath)
             
@@ -456,10 +464,15 @@ class InvoiceForm(QWidget):
                 'year': selected_year
             }
 
-            # Create Invoice directory if it doesn't exist
-            invoice_dir = os.path.join(os.getcwd(), "Invoice")
-            if not os.path.exists(invoice_dir):
-                os.makedirs(invoice_dir)
+            # Create base Invoice directory if it doesn't exist
+            invoice_base_dir = os.path.join(os.getcwd(), "Invoices")
+            if not os.path.exists(invoice_base_dir):
+                os.makedirs(invoice_base_dir)
+            
+            # Create company-specific directory
+            company_dir = os.path.join(invoice_base_dir, company_name)
+            if not os.path.exists(company_dir):
+                os.makedirs(company_dir)
 
             # Initialize Excel generator with template
             template_path = os.path.join(os.getcwd(), "src", "public", "template.xlsx")
@@ -467,7 +480,7 @@ class InvoiceForm(QWidget):
 
             # Generate Excel invoice
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            output_path = os.path.join(invoice_dir, f"invoice_{timestamp}.xlsx")
+            output_path = os.path.join(company_dir, f"invoice_{timestamp}.xlsx")
             
             excel_generator.generate_invoice(excel_data, self.current_calculations)
             excel_generator.save(output_path)
