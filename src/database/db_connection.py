@@ -10,7 +10,8 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Load environment variables from .env file
-load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '../../../.env'))
+project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+load_dotenv(dotenv_path=os.path.join(project_root, '.env'))
 
 # Get DATABASE_URL from environment variable
 DATABASE_URL = os.getenv('DATABASE_URL')
