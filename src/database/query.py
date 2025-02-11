@@ -116,3 +116,64 @@ def get_registered_devices(device_ids):
         
         result = db.execute(query, {"device_ids": tuple(device_ids)})
         return ','.join(row[0] for row in result)
+
+def insert_invoice_data(invoice_data):
+    """Insert invoice data into the invoicedata table"""
+    with next(get_db()) as db:
+        query = text("""
+            INSERT INTO invoicedata (
+                invoiceid, groupName, capacity, regNo, regdevice, issued, ISP,
+                registrationFee, issuanceFee, USDExchange, EURExchange,
+                invoicePeriodFrom, invoicePeriodTo, gross, regFeeINR, issuanceINR,
+                netRevenue, successFee, finalRevenue, project, netRate, pan, gst,
+                address, date, deviceIds, companyName
+            ) VALUES (
+                :invoiceid, :groupName, :capacity, :regNo, :regdevice, :issued, :ISP,
+                :registrationFee, :issuanceFee, :USDExchange, :EURExchange,
+                :invoicePeriodFrom, :invoicePeriodTo, :gross, :regFeeINR, :issuanceINR,
+                :netRevenue, :successFee, :finalRevenue, :project, :netRate, :pan, :gst,
+                :address, :date, :deviceIds, :companyName
+            )
+        """)
+        
+        db.execute(query, invoice_data)
+        db.commit()
+
+def register_devices(device_ids):
+    """Register devices in the invoicereg table"""
+    with next(get_db()) as db:
+        # Convert to list if string
+        if isinstance(device_ids, str):
+            device_ids = device_ids.split(',')
+        
+        # Insert each device ID
+        for device_id in device_ids:
+            query = text("""
+                INSERT INTO invoicereg (`Device ID`)
+                VALUES (:device_id)
+                ON DUPLICATE KEY UPDATE `Device ID` = VALUES(`Device ID`)
+            """)
+            db.execute(query, {"device_id": device_id.strip()})
+        
+        db.commit()
+
+def update_invoice_status(device_ids, year, period_from, period_to):
+    """Update invoice_status to True for the processed records"""
+    with next(get_db()) as db:
+        months = get_months_between(period_from, period_to)
+        
+        query = text("""
+            UPDATE inventory2
+            SET invoice_status = 'False'
+            WHERE `Device ID` IN :device_ids
+            AND Year = :year
+            AND LOWER(Month) IN :months
+        """)
+        
+        db.execute(query, {
+            "device_ids": tuple(device_ids),
+            "year": year,
+            "months": tuple(months)
+        })
+        
+        db.commit()

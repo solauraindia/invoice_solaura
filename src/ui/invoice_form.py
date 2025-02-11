@@ -4,7 +4,9 @@ from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QFormLayout,
                              QMessageBox, QTextBrowser)
 from PyQt5.QtCore import Qt
 from ..database.query import (get_all_sellers_data, get_devices_by_pan, 
-                           get_invoice_data, get_registered_devices)
+                           get_invoice_data, get_registered_devices,
+                           insert_invoice_data, register_devices,
+                           update_invoice_status)
 from ..calculations.invoice_calculator import InvoiceCalculator
 from ..utils.excel_handler import ExcelInvoiceGenerator
 import logging
@@ -15,6 +17,7 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
 import os
 from datetime import datetime
+from nanoid import generate
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -372,8 +375,74 @@ class InvoiceForm(QWidget):
             projects = list(set(device['Project'] for device in self.current_invoice_data))
             project_text = ' and '.join(projects)
             
-            # Get selected year
+            # Get selected year and device IDs
             selected_year = self.year_combo.currentText()
+            device_ids = [device['Device ID'] for device in self.current_invoice_data]
+            device_ids_str = ','.join(device_ids)
+            
+            # Get registered devices and find unregistered ones
+            registered_devices = get_registered_devices(device_ids).split(',') if get_registered_devices(device_ids) else []
+            unregistered_devices = [d for d in device_ids if d not in registered_devices]
+            unregistered_devices_str = ','.join(unregistered_devices)
+            
+            # Format dates
+            period_from = self.period_from_combo.currentText()
+            period_to = self.period_to_combo.currentText()
+            current_date = datetime.now().strftime("%d-%m-%Y")
+            
+            # Generate invoice ID using nanoid
+            invoice_id = generate(size=21)  # Default nanoid length
+            
+            # Prepare invoice data for database
+            invoice_data = {
+                'invoiceid': invoice_id,
+                'groupName': group_name,
+                'capacity': self.current_calculations['capacity'],
+                'regNo': len(device_ids),  # Total number of devices
+                'regdevice': unregistered_devices_str,  # Only unregistered devices
+                'issued': self.current_calculations['total_issued'],
+                'ISP': self.unit_price_spin.value(),
+                'registrationFee': self.current_calculations['registration_fee'],
+                'issuanceFee': self.current_calculations['issuance_fee'],
+                'USDExchange': self.usd_rate_spin.value(),
+                'EURExchange': self.eur_rate_spin.value(),
+                'invoicePeriodFrom': f"01-{datetime.strptime(period_from, '%B').strftime('%m')}-{selected_year}",
+                'invoicePeriodTo': f"31-{datetime.strptime(period_to, '%B').strftime('%m')}-{selected_year}",
+                'gross': self.current_calculations['gross_amount'],
+                'regFeeINR': self.current_calculations['reg_fee_inr'],
+                'issuanceINR': self.current_calculations['issuance_fee_inr'],
+                'netRevenue': self.current_calculations['net_revenue'],
+                'successFee': self.current_calculations['success_fee'],
+                'finalRevenue': self.current_calculations['final_revenue'],
+                'project': project_text,
+                'netRate': self.current_calculations['net_rate'],
+                'pan': seller_info['pan'],
+                'gst': seller_info['gst'],
+                'address': seller_info['address'],
+                'date': current_date,
+                'deviceIds': device_ids_str,
+                'companyName': company_name
+            }
+            
+            try:
+                # Insert invoice data
+                insert_invoice_data(invoice_data)
+                
+                # Register devices
+                register_devices(device_ids)
+                
+                # Update invoice status
+                update_invoice_status(device_ids, selected_year, period_from, period_to)
+                
+                logger.info("Successfully inserted invoice data and registered devices")
+            except Exception as e:
+                logger.error(f"Database operation failed: {str(e)}")
+                QMessageBox.critical(
+                    self,
+                    "Error",
+                    "Failed to save invoice data to database. Please try again."
+                )
+                return
             
             # Prepare data for Excel generation
             excel_data = {
@@ -381,8 +450,8 @@ class InvoiceForm(QWidget):
                 'pan': seller_info['pan'],
                 'gst': seller_info['gst'],
                 'address': seller_info['address'],
-                'period_from': self.period_from_combo.currentText(),
-                'period_to': self.period_to_combo.currentText(),
+                'period_from': period_from,
+                'period_to': period_to,
                 'project': project_text,
                 'year': selected_year
             }
@@ -406,15 +475,15 @@ class InvoiceForm(QWidget):
             QMessageBox.information(
                 self,
                 "Success",
-                f"Excel invoice saved to: {output_path}"
+                f"Invoice data saved and Excel file generated at: {output_path}"
             )
 
         except Exception as e:
-            logger.error(f"Error generating Excel invoice: {str(e)}")
+            logger.error(f"Error in confirm and download: {str(e)}")
             QMessageBox.critical(
                 self,
                 "Error",
-                f"Failed to generate Excel invoice: {str(e)}"
+                f"Failed to process invoice: {str(e)}"
             )
 
     def generate_worksheet_pdf(self, filepath):
