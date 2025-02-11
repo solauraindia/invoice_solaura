@@ -1,6 +1,6 @@
 import os
 from dotenv import load_dotenv
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
 import logging
@@ -26,7 +26,7 @@ def get_db():
     db = SessionLocal()
     try:
         # Try to execute a simple query to check the connection
-        db.execute("SELECT 1")
+        db.execute(text("SELECT 1"))
         logger.info("Database connected successfully")
         yield db
     except Exception as e:

@@ -2,11 +2,19 @@ from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QFormLayout,
                              QLabel, QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox,
                              QPushButton, QFrame)
 from PyQt5.QtCore import Qt
+from ..database.query import get_all_sellers_data
+import logging
+
+# Set up logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 class InvoiceForm(QWidget):
     def __init__(self):
         super().__init__()
+        self.sellers_data = {}
         self.init_ui()
+        self.load_sellers_data()
 
     def init_ui(self):
         # Main layout
@@ -18,10 +26,12 @@ class InvoiceForm(QWidget):
         
         # Group Name
         self.group_name_combo = QComboBox()
+        self.group_name_combo.currentTextChanged.connect(self.on_group_changed)
         form_layout.addRow('Group Name:', self.group_name_combo)
         
         # Company Name
         self.company_name_combo = QComboBox()
+        self.company_name_combo.currentTextChanged.connect(self.on_company_changed)
         form_layout.addRow('Company Name:', self.company_name_combo)
         
         # Year
@@ -92,4 +102,37 @@ class InvoiceForm(QWidget):
         main_layout.addWidget(form_container)
         main_layout.addWidget(preview_container)
         
-        self.setLayout(main_layout) 
+        self.setLayout(main_layout)
+
+    def load_sellers_data(self):
+        """Load sellers data from database and populate dropdowns"""
+        try:
+            self.sellers_data = get_all_sellers_data()
+            logger.info("Successfully retrieved sellers data")
+            logger.info(f"Groups found: {list(self.sellers_data.keys())}")
+            
+            # Populate group dropdown
+            self.group_name_combo.clear()
+            self.group_name_combo.addItems(sorted(self.sellers_data.keys()))
+            
+        except Exception as e:
+            logger.error(f"Error loading sellers data: {str(e)}")
+
+    def on_group_changed(self, group_name):
+        """Handle group selection change"""
+        self.company_name_combo.clear()
+        if group_name in self.sellers_data:
+            companies = [seller["seller"] for seller in self.sellers_data[group_name]]
+            logger.info(f"Companies for group {group_name}: {companies}")
+            self.company_name_combo.addItems(companies)
+
+    def on_company_changed(self, company_name):
+        """Handle company selection change"""
+        group_name = self.group_name_combo.currentText()
+        if group_name in self.sellers_data:
+            for seller in self.sellers_data[group_name]:
+                if seller["seller"] == company_name:
+                    logger.info(f"Setting values for {company_name}")
+                    self.success_fee_spin.setValue(float(seller["success_fee"]))
+                    self.unit_price_spin.setValue(float(seller["indicative_price"]))
+                    break 
