@@ -25,3 +25,90 @@ def get_all_sellers_data():
             sellers_data[group].append(seller_info)
 
         return sellers_data
+
+def get_devices_by_pan(pan):
+    """Get distinct device IDs from inventory2 table for a given PAN number"""
+    with next(get_db()) as db:
+        query = text("""
+            SELECT DISTINCT `Device ID`
+            FROM inventory2
+            WHERE PAN = :pan
+            ORDER BY `Device ID`
+        """)
+        result = db.execute(query, {"pan": pan})
+        return [row[0] for row in result]
+
+def get_seller_pan(company_name, group_name):
+    """Get PAN number for a given company and group"""
+    with next(get_db()) as db:
+        query = text("""
+            SELECT pan
+            FROM sellers
+            WHERE seller = :company_name AND `group` = :group_name
+        """)
+        result = db.execute(query, {
+            "company_name": company_name,
+            "group_name": group_name
+        })
+        row = result.fetchone()
+        return row[0] if row else None
+
+def get_months_between(from_month, to_month):
+    """Get list of months between two months inclusive"""
+    months = ["january", "february", "march", "april", "may", "june",
+             "july", "august", "september", "october", "november", "december"]
+    # Convert input months to lowercase for comparison
+    from_month = from_month.lower()
+    to_month = to_month.lower()
+    start_idx = months.index(from_month)
+    end_idx = months.index(to_month)
+    return months[start_idx:end_idx + 1]
+
+def get_invoice_data(device_ids, year, period_from, period_to):
+    """Get invoice data for selected devices and period"""
+    months = get_months_between(period_from, period_to)
+
+    print("device_ids", device_ids)
+    print("year", year)
+    print("period_from", period_from)
+    print("period_to", period_to)
+    
+    # Generate dynamic SQL for each month's issued sum
+    month_sums = []
+    for month in months:
+        month_sums.append(f"SUM(CASE WHEN LOWER(Month) = '{month}' THEN Issued ELSE 0 END) AS `{month}Issued`")
+    month_sums_sql = ", ".join(month_sums)
+    
+    # Convert months to tuple for IN clause
+    months_tuple = tuple(months)
+    
+    with next(get_db()) as db:
+        query = text(f"""
+            SELECT 
+                `Device ID`,
+                `Project`,
+                MIN(`Capacity (MW)`) AS Capacity,
+                SUM(Issued) AS TotalIssued,
+                {month_sums_sql}
+            FROM inventory2
+            WHERE 
+                `Device ID` IN :device_ids AND 
+                Year = :year AND 
+                LOWER(Month) IN :months AND
+                Issued = Actual_used AND
+                invoice_status = 'False'
+            GROUP BY `Device ID`, `Project`
+        """)
+        
+        # Prepare parameters
+        params = {
+            "device_ids": tuple(device_ids),
+            "year": year,
+            "months": months_tuple
+        }
+            
+        result = db.execute(query, params)
+        
+        # Convert result to list of dictionaries
+        columns = result.keys()
+        return [dict(zip(columns, row)) for row in result]
