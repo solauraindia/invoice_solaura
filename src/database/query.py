@@ -63,9 +63,12 @@ def get_invoice_data(device_ids, year, period_from, period_to):
     
     # Generate dynamic SQL for each month's issued sum
     month_sums = []
+    month_issue_process = []
     for month in months:
         month_sums.append(f"SUM(CASE WHEN LOWER(Month) = '{month}' THEN Issued ELSE 0 END) AS `{month}Issued`")
+        month_issue_process.append(f"MAX(CASE WHEN LOWER(Month) = '{month}' THEN issue_process ELSE NULL END) AS `{month}IssueProcess`")
     month_sums_sql = ", ".join(month_sums)
+    month_issue_process_sql = ", ".join(month_issue_process)
     
     # Convert months to tuple for IN clause
     months_tuple = tuple(months)
@@ -77,13 +80,14 @@ def get_invoice_data(device_ids, year, period_from, period_to):
                 `Project`,
                 MIN(`Capacity (MW)`) AS Capacity,
                 SUM(Issued) AS TotalIssued,
-                {month_sums_sql}
+                {month_sums_sql},
+                {month_issue_process_sql}
             FROM inventory2
             WHERE 
                 `Device ID` IN :device_ids AND 
                 Year = :year AND 
                 LOWER(Month) IN :months AND
-                Issued = Actual_used AND
+                Issued > 0 AND
                 invoice_status = 'False'
             GROUP BY `Device ID`, `Project`
         """)
@@ -97,9 +101,28 @@ def get_invoice_data(device_ids, year, period_from, period_to):
             
         result = db.execute(query, params)
         
-        # Convert result to list of dictionaries
+        # Convert result to list of dictionaries and process partial issues
         columns = result.keys()
-        return [dict(zip(columns, row)) for row in result]
+        invoice_data = []
+        
+        for row in result:
+            data = dict(zip(columns, row))
+            
+            # Add is_partial flag for each month
+            for month in months:
+                issue_process_key = f"{month}IssueProcess"
+                if data.get(issue_process_key):
+                    try:
+                        issue_process = eval(data[issue_process_key])  # Convert JSON string to Python object
+                        data[f"{month}IsPartial"] = len(issue_process) > 1 if isinstance(issue_process, list) else False
+                    except:
+                        data[f"{month}IsPartial"] = False
+                else:
+                    data[f"{month}IsPartial"] = False
+            
+            invoice_data.append(data)
+            
+        return invoice_data
 
 def get_registered_devices(device_ids):
     """Get list of registered device IDs from invoicereg table"""

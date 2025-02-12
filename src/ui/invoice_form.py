@@ -1,14 +1,17 @@
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QFormLayout,
                              QLabel, QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox,
                              QPushButton, QFrame, QCheckBox, QScrollArea, QGroupBox,
-                             QMessageBox, QTextBrowser, QSizePolicy)
+                             QMessageBox, QTextBrowser, QSizePolicy, QDialog, QTableWidget,
+                             QTableWidgetItem, QHeaderView)
 from PyQt5.QtCore import Qt
 from ..database.query import (get_all_sellers_data, get_devices_by_pan, 
                            get_invoice_data, get_registered_devices,
-                           insert_invoice_data, register_devices)
+                           insert_invoice_data, register_devices,
+                           get_months_between)
 from ..calculations.invoice_calculator import InvoiceCalculator
 from ..utils.excel_handler import ExcelInvoiceGenerator
 import logging
+from decimal import Decimal
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
@@ -280,11 +283,6 @@ class InvoiceForm(QWidget):
             year = int(self.year_combo.currentText())
             period_from = self.period_from_combo.currentText()
             period_to = self.period_to_combo.currentText()
-            unit_price = self.unit_price_spin.value()
-            success_fee = 0 if self.remove_fees_checkbox.isChecked() else self.success_fee_spin.value()
-            usd_rate = self.usd_rate_spin.value()
-            eur_rate = self.eur_rate_spin.value()
-            remove_fees = self.remove_fees_checkbox.isChecked()
             
             # Get invoice data
             invoice_data = get_invoice_data(
@@ -302,6 +300,48 @@ class InvoiceForm(QWidget):
                 )
                 return
 
+            # Check for partial issues
+            partial_issues = []
+            for data in invoice_data:
+                for month in get_months_between(period_from, period_to):
+                    if data.get(f"{month}IsPartial", False):
+                        issue_process = eval(data[f"{month}IssueProcess"])
+                        partial_issues.append({
+                            'device_id': data['Device ID'],
+                            'year': year,
+                            'month': month,
+                            'default_value': data[f"{month}Issued"],
+                            'issue_process': issue_process
+                        })
+            
+            # If partial issues exist, show modal
+            selected_values = {}
+            if partial_issues:
+                dialog = PartialIssueModal(partial_issues, self)
+                if dialog.exec_() == QDialog.Accepted:
+                    selected_values = dialog.selected_values
+                else:
+                    return  # User cancelled
+                
+                # Update invoice data with selected values
+                for data in invoice_data:
+                    # First update the monthly values for partial issues
+                    for month in get_months_between(period_from, period_to):
+                        key = f"{data['Device ID']}_{month}"
+                        if key in selected_values:
+                            data[f"{month}Issued"] = float(selected_values[key])
+                    
+                    # Now recalculate TotalIssued for all devices
+                    total_issued = Decimal('0.0000')
+                    for month in get_months_between(period_from, period_to):
+                        # Sum up all months' values, whether they were partial or not
+                        month_value = data.get(f"{month}Issued", 0)
+                        total_issued += Decimal(str(month_value))
+                    
+                    # Update the total issued for this device
+                    data['TotalIssued'] = float(total_issued)
+                    logger.info(f"Updated TotalIssued for {data['Device ID']}: {float(total_issued)}")
+
             # Get registered devices
             device_ids = ','.join(d['Device ID'] for d in invoice_data)
             registered_devices = get_registered_devices(device_ids)
@@ -310,11 +350,11 @@ class InvoiceForm(QWidget):
             calculations = InvoiceCalculator.calculate_invoice_amounts(
                 invoice_data,
                 registered_devices,
-                unit_price,
-                success_fee,
-                usd_rate,
-                eur_rate,
-                remove_fees
+                self.unit_price_spin.value(),
+                0 if self.remove_fees_checkbox.isChecked() else self.success_fee_spin.value(),
+                self.usd_rate_spin.value(),
+                self.eur_rate_spin.value(),
+                self.remove_fees_checkbox.isChecked()
             )
                 
             # Enable both download buttons after successful generation
@@ -786,3 +826,126 @@ class InvoiceForm(QWidget):
         
         # Set the HTML content
         self.preview_text.setHtml("\n".join(preview_text)) 
+
+class PartialIssueModal(QDialog):
+    def __init__(self, partial_issues_data, parent=None):
+        super().__init__(parent)
+        self.partial_issues_data = partial_issues_data
+        self.selected_values = {}
+        self.checkboxes = {}  # Store checkboxes for each row
+        self.init_ui()
+        
+    def init_ui(self):
+        self.setWindowTitle("Choose Partial Issue Values")
+        self.setMinimumWidth(800)  # Increased width for better visibility
+        layout = QVBoxLayout()
+        
+        # Add description label
+        description = QLabel("For partial issues, you can select multiple values. The sum of selected values will be used.")
+        description.setStyleSheet("color: #666; margin-bottom: 10px;")
+        layout.addWidget(description)
+        
+        # Create table
+        self.table = QTableWidget()
+        self.table.setColumnCount(6)  # Device ID, Year, Month, Available Values, Selected Values, Sum
+        self.table.setHorizontalHeaderLabels(["Device ID", "Year", "Month", "Available Values", "Selected Values", "Sum"])
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        
+        # Populate table
+        self.table.setRowCount(len(self.partial_issues_data))
+        for row, data in enumerate(self.partial_issues_data):
+            self.table.setItem(row, 0, QTableWidgetItem(data['device_id']))
+            self.table.setItem(row, 1, QTableWidgetItem(str(data['year'])))
+            self.table.setItem(row, 2, QTableWidgetItem(data['month']))
+            
+            # Create container widget for checkboxes
+            checkbox_container = QWidget()
+            checkbox_layout = QVBoxLayout(checkbox_container)
+            checkbox_layout.setContentsMargins(5, 5, 5, 5)
+            checkbox_layout.setSpacing(2)
+            
+            # Convert default_value to Decimal
+            default_value = Decimal(str(data['default_value']))
+            
+            # Add default value checkbox
+            default_checkbox = QCheckBox(f"Default ({default_value:.4f})")
+            default_checkbox.setProperty('value', default_value)
+            default_checkbox.setProperty('row', row)
+            default_checkbox.stateChanged.connect(self.on_checkbox_changed)
+            checkbox_layout.addWidget(default_checkbox)
+            
+            # Store checkboxes for this row
+            key = f"{data['device_id']}_{data['month']}"
+            self.checkboxes[key] = [default_checkbox]
+            
+            # Add checkboxes for each value in issue_process
+            for i, value in enumerate(data['issue_process']):
+                # Convert value to Decimal
+                decimal_value = Decimal(str(value))
+                checkbox = QCheckBox(f"Value {i+1} ({decimal_value:.4f})")
+                checkbox.setProperty('value', decimal_value)
+                checkbox.setProperty('row', row)
+                checkbox.stateChanged.connect(self.on_checkbox_changed)
+                checkbox_layout.addWidget(checkbox)
+                self.checkboxes[key].append(checkbox)
+            
+            # Add stretch to align checkboxes to top
+            checkbox_layout.addStretch()
+            
+            # Add checkbox container to table
+            self.table.setCellWidget(row, 3, checkbox_container)
+            
+            # Selected values column (will show list of selected values)
+            self.table.setItem(row, 4, QTableWidgetItem(""))
+            
+            # Sum column
+            self.table.setItem(row, 5, QTableWidgetItem("0.0000"))
+            
+            # Initialize selected values with Decimal zero
+            self.selected_values[key] = Decimal('0.0000')
+            
+            # Check the default checkbox initially
+            default_checkbox.setChecked(True)
+        
+        layout.addWidget(self.table)
+        
+        # Buttons
+        button_layout = QHBoxLayout()
+        ok_button = QPushButton("OK")
+        ok_button.clicked.connect(self.accept)
+        cancel_button = QPushButton("Cancel")
+        cancel_button.clicked.connect(self.reject)
+        button_layout.addWidget(ok_button)
+        button_layout.addWidget(cancel_button)
+        layout.addLayout(button_layout)
+        
+        self.setLayout(layout)
+    
+    def on_checkbox_changed(self, state):
+        checkbox = self.sender()
+        row = checkbox.property('row')
+        value = checkbox.property('value')
+        
+        # Get device_id and month for this row
+        device_id = self.table.item(row, 0).text()
+        month = self.table.item(row, 2).text()
+        key = f"{device_id}_{month}"
+        
+        # Calculate sum of checked values
+        sum_value = Decimal('0.0000')
+        selected_values = []
+        
+        for cb in self.checkboxes[key]:
+            if cb.isChecked():
+                cb_value = cb.property('value')
+                sum_value += cb_value
+                selected_values.append(f"{cb_value:.4f}")
+        
+        # Update selected values column
+        self.table.item(row, 4).setText(", ".join(selected_values))
+        
+        # Update sum column
+        self.table.item(row, 5).setText(f"{sum_value:.4f}")
+        
+        # Store the sum in selected_values
+        self.selected_values[key] = sum_value 
