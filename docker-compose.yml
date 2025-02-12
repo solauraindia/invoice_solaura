@@ -1,0 +1,13 @@
+version: '3.8'
+
+services:
+  invoice-app:
+    build: .
+    volumes:
+      - .:/app
+      - /tmp/.X11-unix:/tmp/.X11-unix  # Share X11 socket
+    environment:
+      - DISPLAY=${DISPLAY}
+      - QT_X11_NO_MITSHM=1  # Fix for some X11 issues
+      - DATABASE_URL=${DATABASE_URL}
+    network_mode: "host"  # Needed for X11 and database connection 

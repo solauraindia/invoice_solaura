@@ -6,3 +6,6 @@ reportlab==4.0.8
 cryptography==41.0.7  # Required for secure MySQL connections
 PyMySQL[rsa]==1.1.0  # For MySQL with SSL support
 openpyxl==3.1.2  # For Excel handling
+nanoid==1.0.0  # For generating unique IDs
+mysqlclient==2.1.1  # For MySQL client
+pymysql==1.1.0  # For MySQL client
