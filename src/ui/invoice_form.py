@@ -115,6 +115,10 @@ class InvoiceForm(QWidget):
         self.eur_rate_spin.setDecimals(4)
         form_layout.addRow('EUR Exchange Rate:', self.eur_rate_spin)
         
+        # Add Remove Fees checkbox
+        self.remove_fees_checkbox = QCheckBox('Remove Fees')
+        form_layout.addRow('', self.remove_fees_checkbox)
+        
         # Button container
         button_container = QWidget()
         button_layout = QHBoxLayout()
@@ -277,9 +281,10 @@ class InvoiceForm(QWidget):
             period_from = self.period_from_combo.currentText()
             period_to = self.period_to_combo.currentText()
             unit_price = self.unit_price_spin.value()
-            success_fee = self.success_fee_spin.value()
+            success_fee = 0 if self.remove_fees_checkbox.isChecked() else self.success_fee_spin.value()
             usd_rate = self.usd_rate_spin.value()
             eur_rate = self.eur_rate_spin.value()
+            remove_fees = self.remove_fees_checkbox.isChecked()
             
             # Get invoice data
             invoice_data = get_invoice_data(
@@ -308,7 +313,8 @@ class InvoiceForm(QWidget):
                 unit_price,
                 success_fee,
                 usd_rate,
-                eur_rate
+                eur_rate,
+                remove_fees
             )
                 
             # Enable both download buttons after successful generation

@@ -11,7 +11,7 @@ class InvoiceCalculator:
 
     @staticmethod
     def calculate_invoice_amounts(invoice_data, registered_devices, unit_sale_price, 
-                                success_fee_percent, usd_rate, eur_rate):
+                                success_fee_percent, usd_rate, eur_rate, remove_fees=False):
         """Calculate all invoice amounts"""
         # Split registered and unregistered devices
         registered = set(registered_devices.split(',')) if registered_devices else set()
@@ -29,17 +29,17 @@ class InvoiceCalculator:
             total_capacity += capacity
             total_issued += issued
             
-            # Calculate registration fee only for unregistered devices
-            if device_id not in registered:
+            # Calculate registration fee only for unregistered devices and if fees are not removed
+            if not remove_fees and device_id not in registered:
                 registration_fee += InvoiceCalculator.calculate_registration_fee(capacity)
         
         # Calculate all amounts
-        issuance_fee = 0.025 * total_issued
+        issuance_fee = 0.025 * total_issued if not remove_fees else 0
         gross_amount = total_issued * unit_sale_price * usd_rate
-        reg_fee_inr = registration_fee * eur_rate
-        issuance_fee_inr = issuance_fee * eur_rate
+        reg_fee_inr = registration_fee * eur_rate if not remove_fees else 0
+        issuance_fee_inr = issuance_fee * eur_rate if not remove_fees else 0
         net_revenue = gross_amount - (reg_fee_inr + issuance_fee_inr)
-        success_fee = (success_fee_percent / 100) * net_revenue
+        success_fee = (success_fee_percent / 100) * net_revenue if not remove_fees else 0
         final_revenue = net_revenue - success_fee
         net_rate = final_revenue / total_issued if total_issued > 0 else 0
         
