@@ -841,7 +841,7 @@ class PartialIssueModal(QDialog):
         layout = QVBoxLayout()
         
         # Add description label
-        description = QLabel("For partial issues, you can select multiple values. The sum of selected values will be used.")
+        description = QLabel("For partial issues, select either the default value OR one or more other values.")
         description.setStyleSheet("color: #666; margin-bottom: 10px;")
         layout.addWidget(description)
         
@@ -850,6 +850,9 @@ class PartialIssueModal(QDialog):
         self.table.setColumnCount(6)  # Device ID, Year, Month, Available Values, Selected Values, Sum
         self.table.setHorizontalHeaderLabels(["Device ID", "Year", "Month", "Available Values", "Selected Values", "Sum"])
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        
+        # Set row height
+        self.table.verticalHeader().setDefaultSectionSize(100)  # Increased row height
         
         # Populate table
         self.table.setRowCount(len(self.partial_issues_data))
@@ -862,7 +865,7 @@ class PartialIssueModal(QDialog):
             checkbox_container = QWidget()
             checkbox_layout = QVBoxLayout(checkbox_container)
             checkbox_layout.setContentsMargins(5, 5, 5, 5)
-            checkbox_layout.setSpacing(2)
+            checkbox_layout.setSpacing(5)  # Increased spacing between checkboxes
             
             # Convert default_value to Decimal
             default_value = Decimal(str(data['default_value']))
@@ -871,6 +874,7 @@ class PartialIssueModal(QDialog):
             default_checkbox = QCheckBox(f"Default ({default_value:.4f})")
             default_checkbox.setProperty('value', default_value)
             default_checkbox.setProperty('row', row)
+            default_checkbox.setProperty('is_default', True)
             default_checkbox.stateChanged.connect(self.on_checkbox_changed)
             checkbox_layout.addWidget(default_checkbox)
             
@@ -885,6 +889,7 @@ class PartialIssueModal(QDialog):
                 checkbox = QCheckBox(f"Value {i+1} ({decimal_value:.4f})")
                 checkbox.setProperty('value', decimal_value)
                 checkbox.setProperty('row', row)
+                checkbox.setProperty('is_default', False)
                 checkbox.stateChanged.connect(self.on_checkbox_changed)
                 checkbox_layout.addWidget(checkbox)
                 self.checkboxes[key].append(checkbox)
@@ -925,11 +930,22 @@ class PartialIssueModal(QDialog):
         checkbox = self.sender()
         row = checkbox.property('row')
         value = checkbox.property('value')
+        is_default = checkbox.property('is_default')
         
         # Get device_id and month for this row
         device_id = self.table.item(row, 0).text()
         month = self.table.item(row, 2).text()
         key = f"{device_id}_{month}"
+        
+        # Handle mutual exclusivity
+        if state == Qt.Checked:
+            # If default is checked, uncheck all others
+            if is_default:
+                for cb in self.checkboxes[key][1:]:  # Skip default checkbox
+                    cb.setChecked(False)
+            else:
+                # If any other is checked, uncheck default
+                self.checkboxes[key][0].setChecked(False)
         
         # Calculate sum of checked values
         sum_value = Decimal('0.0000')
