@@ -124,7 +124,7 @@ class InvoiceForm(QWidget):
         button_layout = QHBoxLayout()
         
         # Generate Button
-        self.generate_btn = QPushButton('Generate Invoice')
+        self.generate_btn = QPushButton('Generate Calculations')
         self.generate_btn.clicked.connect(self.on_generate_clicked)
         button_layout.addWidget(self.generate_btn)
         
@@ -638,110 +638,137 @@ class InvoiceForm(QWidget):
                 margin: 0;
                 padding: 0;
             }
+            .main-container {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                width: 100%;
+                padding: 0 20px;
+            }
+            .table-container {
+                width: 100%;
+                max-width: 800px;
+                margin: 0 auto;
+            }
             table {
                 width: 100%;
-                margin: 0;
                 border-collapse: collapse;
-                table-layout: fixed;
+                margin: 0 auto;
+                background-color: white;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.1);
             }
             th, td {
-                padding: 8px;
+                padding: 12px 15px;
                 border: 1px solid #ddd;
                 white-space: nowrap;
                 overflow: hidden;
                 text-overflow: ellipsis;
             }
             th {
-                background-color: #f0f0f0;
+                background-color: #f5f5f5;
                 font-weight: bold;
                 text-align: center;
+                padding: 15px;
+                font-size: 14px;
+                text-transform: uppercase;
             }
             td:first-child {
-                width: 65%;
+                width: 60%;
                 text-align: left;
-                padding-left: 15px;
+                padding-left: 20px;
+                font-size: 13px;
             }
             td:last-child {
-                width: 35%;
+                width: 40%;
                 text-align: right;
-                padding-right: 15px;
+                padding-right: 20px;
+                font-size: 13px;
             }
             h3 {
                 text-align: center;
-                margin: 10px 0 20px 0;
+                margin: 5px 0 15px 0;
                 padding: 0;
+                width: 100%;
+                font-size: 16px;
+            }
+            tr:hover {
+                background-color: #f9f9f9;
             }
         </style>
-        <h3>Worksheet Calculations</h3>
+        <div class="main-container">
+            <h3>Worksheet Calculations</h3>
+            <div class="table-container">
         """)
         
         # Single comprehensive table
         preview_text.append("""
-        <table>
-            <tr>
-                <th colspan='2'>Device Information</th>
-            </tr>
-            <tr>
-                <td>Total Devices</td>
-                <td>{}</td>
-            </tr>
-            <tr>
-                <td>Total Capacity</td>
-                <td>{:.2f} MW</td>
-            </tr>
-            <tr>
-                <td>Total Issued</td>
-                <td>{:.4f}</td>
-            </tr>
-            
-            <tr>
-                <th colspan='2'>Fees</th>
-            </tr>
-            <tr>
-                <td>Registration Fee (EUR)</td>
-                <td>{:.2f}</td>
-            </tr>
-            <tr>
-                <td>Registration Fee (INR)</td>
-                <td>{:.4f}</td>
-            </tr>
-            <tr>
-                <td>Issuance Fee (EUR)</td>
-                <td>{:.4f}</td>
-            </tr>
-            <tr>
-                <td>Issuance Fee (INR)</td>
-                <td>{:.4f}</td>
-            </tr>
-            
-            <tr>
-                <th colspan='2'>Revenue Calculation</th>
-            </tr>
-            <tr>
-                <td>Gross Amount (INR)</td>
-                <td>{:.4f}</td>
-            </tr>
-            <tr>
-                <td>Net Revenue (INR)</td>
-                <td>{:.4f}</td>
-            </tr>
-            <tr>
-                <td>Success Fee (INR)</td>
-                <td>{:.4f}</td>
-            </tr>
-            <tr>
-                <td>Final Revenue (INR)</td>
-                <td>{:.4f}</td>
-            </tr>
-            
-            <tr>
-                <th colspan='2'>Final Rate</th>
-            </tr>
-            <tr>
-                <td>Net Rate</td>
-                <td>{:.4f}</td>
-            </tr>
-        </table>
+                <table>
+                    <tr>
+                        <th colspan='2'>Device Information</th>
+                    </tr>
+                    <tr>
+                        <td>Total Devices</td>
+                        <td>{}</td>
+                    </tr>
+                    <tr>
+                        <td>Total Capacity</td>
+                        <td>{:.2f} MW</td>
+                    </tr>
+                    <tr>
+                        <td>Total Issued</td>
+                        <td>{:.4f}</td>
+                    </tr>
+                    
+                    <tr>
+                        <th colspan='2'>Fees</th>
+                    </tr>
+                    <tr>
+                        <td>Registration Fee (EUR)</td>
+                        <td>{:.2f}</td>
+                    </tr>
+                    <tr>
+                        <td>Registration Fee (INR)</td>
+                        <td>{:.4f}</td>
+                    </tr>
+                    <tr>
+                        <td>Issuance Fee (EUR)</td>
+                        <td>{:.4f}</td>
+                    </tr>
+                    <tr>
+                        <td>Issuance Fee (INR)</td>
+                        <td>{:.4f}</td>
+                    </tr>
+                    
+                    <tr>
+                        <th colspan='2'>Revenue Calculation</th>
+                    </tr>
+                    <tr>
+                        <td>Gross Amount (INR)</td>
+                        <td>{:.4f}</td>
+                    </tr>
+                    <tr>
+                        <td>Net Revenue (INR)</td>
+                        <td>{:.4f}</td>
+                    </tr>
+                    <tr>
+                        <td>Success Fee (INR)</td>
+                        <td>{:.4f}</td>
+                    </tr>
+                    <tr>
+                        <td>Final Revenue (INR)</td>
+                        <td>{:.4f}</td>
+                    </tr>
+                    
+                    <tr>
+                        <th colspan='2'>Final Rate</th>
+                    </tr>
+                    <tr>
+                        <td>Net Rate</td>
+                        <td>{:.4f}</td>
+                    </tr>
+                </table>
+            </div>
+        </div>
         """.format(
             calculations['total_devices'],
             calculations['capacity'],
