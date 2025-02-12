@@ -4,6 +4,7 @@ from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QFormLayout,
                              QMessageBox, QTextBrowser, QSizePolicy, QDialog, QTableWidget,
                              QTableWidgetItem, QHeaderView)
 from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QIcon
 from ..database.query import (get_all_sellers_data, get_devices_by_pan, 
                            get_invoice_data, get_registered_devices,
                            insert_invoice_data, register_devices,
@@ -20,6 +21,7 @@ from reportlab.lib.units import inch
 import os
 from datetime import datetime
 from nanoid import generate
+import sys
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -31,6 +33,22 @@ class InvoiceForm(QWidget):
         self.sellers_data = {}
         self.init_ui()
         self.load_sellers_data()
+        
+        # Set window icon
+        icon_path = self.resource_path(os.path.join('src', 'public', 'invoice.ico'))
+        if os.path.exists(icon_path):
+            self.setWindowIcon(QIcon(icon_path))
+        else:
+            print(f"Warning: Icon file not found at {icon_path}")
+
+    def resource_path(self, relative_path):
+        """Get absolute path to resource, works for dev and for PyInstaller"""
+        try:
+            # PyInstaller creates a temp folder and stores path in _MEIPASS
+            base_path = sys._MEIPASS
+        except Exception:
+            base_path = os.path.abspath(".")
+        return os.path.join(base_path, relative_path)
 
     def init_ui(self):
         # Main layout
@@ -520,7 +538,7 @@ class InvoiceForm(QWidget):
             }
 
             # Initialize Excel generator with template
-            template_path = os.path.join(os.getcwd(), "src", "public", "template.xlsx")
+            template_path = self.resource_path(os.path.join("src", "public", "template.xlsx"))
             excel_generator = ExcelInvoiceGenerator(template_path)
 
             # Generate Excel invoice
@@ -835,8 +853,16 @@ class PartialIssueModal(QDialog):
         self.checkboxes = {}  # Store checkboxes for each row
         self.init_ui()
         
+        # Set window icon
+        icon_path = self.resource_path(os.path.join('src', 'public', 'invoice.ico'))
+        if os.path.exists(icon_path):
+            self.setWindowIcon(QIcon(icon_path))
+        else:
+            print(f"Warning: Icon file not found at {icon_path}")
+        
+        self.setWindowTitle('Partial Issues Found')
+        
     def init_ui(self):
-        self.setWindowTitle("Choose Partial Issue Values")
         self.setMinimumWidth(800)  # Increased width for better visibility
         layout = QVBoxLayout()
         
@@ -965,3 +991,12 @@ class PartialIssueModal(QDialog):
         
         # Store the sum in selected_values
         self.selected_values[key] = sum_value 
+
+    def resource_path(self, relative_path):
+        """Get absolute path to resource, works for dev and for PyInstaller"""
+        try:
+            # PyInstaller creates a temp folder and stores path in _MEIPASS
+            base_path = sys._MEIPASS
+        except Exception:
+            base_path = os.path.abspath(".")
+        return os.path.join(base_path, relative_path) 
