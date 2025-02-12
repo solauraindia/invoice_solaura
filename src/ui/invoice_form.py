@@ -568,79 +568,82 @@ class InvoiceForm(QWidget):
         styles = getSampleStyleSheet()
         elements = []
         
-        # Title
+        # Get group name and company name
+        group_name = self.group_name_combo.currentText()
+        company_name = self.company_name_combo.currentText()
+        
+        # Title with group and company name
         title_style = ParagraphStyle(
             'CustomTitle',
             parent=styles['Heading1'],
             fontSize=16,
-            spaceAfter=30
+            spaceAfter=30,
+            alignment=1  # Center alignment
         )
-        elements.append(Paragraph("Invoice Worksheet", title_style))
+        elements.append(Paragraph(f"{group_name} - {company_name}", title_style))
         
-        # Device Information
-        elements.append(Paragraph("Device Information", styles['Heading2']))
-        device_data = [
+        # Create one main table for all data
+        table_data = []
+        
+        # Device Information section
+        table_data.extend([
+            [Paragraph("<b>Device Information</b>", styles['Heading2']), ""],
             ["Total Devices", str(self.current_calculations['total_devices'])],
             ["Total Capacity (MW)", f"{self.current_calculations['capacity']:.2f}"],
-            ["Total Issued", f"{self.current_calculations['total_issued']:.4f}"]
-        ]
-        device_table = Table(device_data, colWidths=[3*inch, 3*inch])
-        device_table.setStyle(TableStyle([
-            ('GRID', (0, 0), (-1, -1), 1, colors.black),
-            ('BACKGROUND', (0, 0), (0, -1), colors.lightgrey),
-            ('PADDING', (0, 0), (-1, -1), 6)
-        ]))
-        elements.append(device_table)
-        elements.append(Spacer(1, 20))
+            ["Total Issued", f"{self.current_calculations['total_issued']:.4f}"],
+            ["", ""],  # Empty row for spacing
+        ])
         
-        # Fees
-        elements.append(Paragraph("Fees", styles['Heading2']))
-        fees_data = [
+        # Fees section
+        table_data.extend([
+            [Paragraph("<b>Fees</b>", styles['Heading2']), ""],
             ["Registration Fee (EUR)", f"{self.current_calculations['registration_fee']:.2f}"],
             ["Registration Fee (INR)", f"{self.current_calculations['reg_fee_inr']:.4f}"],
             ["Issuance Fee (EUR)", f"{self.current_calculations['issuance_fee']:.4f}"],
-            ["Issuance Fee (INR)", f"{self.current_calculations['issuance_fee_inr']:.4f}"]
-        ]
-        fees_table = Table(fees_data, colWidths=[3*inch, 3*inch])
-        fees_table.setStyle(TableStyle([
-            ('GRID', (0, 0), (-1, -1), 1, colors.black),
-            ('BACKGROUND', (0, 0), (0, -1), colors.lightgrey),
-            ('PADDING', (0, 0), (-1, -1), 6)
-        ]))
-        elements.append(fees_table)
-        elements.append(Spacer(1, 20))
+            ["Issuance Fee (INR)", f"{self.current_calculations['issuance_fee_inr']:.4f}"],
+            ["", ""],  # Empty row for spacing
+        ])
         
-        # Revenue Calculations
-        elements.append(Paragraph("Revenue Calculations", styles['Heading2']))
-        revenue_data = [
+        # Revenue Calculations section
+        table_data.extend([
+            [Paragraph("<b>Revenue Calculations</b>", styles['Heading2']), ""],
             ["Gross Amount (INR)", f"{self.current_calculations['gross_amount']:.4f}"],
             ["Net Revenue (INR)", f"{self.current_calculations['net_revenue']:.4f}"],
             ["Success Fee (INR)", f"{self.current_calculations['success_fee']:.4f}"],
             ["Final Revenue (INR)", f"{self.current_calculations['final_revenue']:.4f}"],
-            ["Net Rate", f"{self.current_calculations['net_rate']:.4f}"]
-        ]
-        revenue_table = Table(revenue_data, colWidths=[3*inch, 3*inch])
-        revenue_table.setStyle(TableStyle([
+            ["Net Rate", f"{self.current_calculations['net_rate']:.4f}"],
+            ["", ""],  # Empty row for spacing
+        ])
+        
+        # Create the main table
+        main_table = Table(table_data, colWidths=[4*inch, 3*inch])
+        main_table.setStyle(TableStyle([
             ('GRID', (0, 0), (-1, -1), 1, colors.black),
-            ('BACKGROUND', (0, 0), (0, -1), colors.lightgrey),
-            ('PADDING', (0, 0), (-1, -1), 6)
+            ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),  # Header row
+            ('BACKGROUND', (0, 5), (-1, 5), colors.lightgrey),  # Fees header
+            ('BACKGROUND', (0, 11), (-1, 11), colors.lightgrey),  # Revenue header
+            ('PADDING', (0, 0), (-1, -1), 6),
+            ('ALIGN', (1, 0), (1, -1), 'RIGHT'),  # Right align all values in second column
         ]))
-        elements.append(revenue_table)
+        elements.append(main_table)
         elements.append(Spacer(1, 20))
         
         # Device Details with Monthly Issuance
-        elements.append(Paragraph("Device Details", styles['Heading2']))
+        elements.append(Paragraph("<b>Device Details</b>", styles['Heading2']))
         
         # Get all months from the first device's data
         months = []
+        month_order = {
+            'jan': 1, 'feb': 2, 'mar': 3, 'apr': 4, 'may': 5, 'jun': 6,
+            'jul': 7, 'aug': 8, 'sep': 9, 'oct': 10, 'nov': 11, 'dec': 12
+        }
         if self.current_invoice_data:
             for key in self.current_invoice_data[0].keys():
                 if key.endswith('Issued') and key != 'TotalIssued':
                     month = key.replace('Issued', '')
-                    # Use 3-letter month abbreviations
-                    month = month[:3]
+                    month = month[:3].lower()  # Use lowercase 3-letter month abbreviations
                     months.append(month)
-        months.sort()  # Sort months alphabetically
+            months.sort(key=lambda x: month_order[x])  # Sort months chronologically
         
         # Create headers for the table
         headers = ["Device ID"] + months + ["Tot"]
@@ -650,33 +653,32 @@ class InvoiceForm(QWidget):
         for device in self.current_invoice_data:
             row = [device['Device ID']]
             for month in months:
-                # Find the full month name in the original data
                 full_month = next(k.replace('Issued', '') for k in device.keys() 
                                 if k.endswith('Issued') and k.startswith(month))
                 month_key = f"{full_month}Issued"
                 value = device.get(month_key, 0)
-                row.append(f"{float(value):.2f}" if value else "0.00")  # Reduced decimal places
-            row.append(f"{float(device['TotalIssued']):.2f}")  # Reduced decimal places
+                row.append(f"{float(value):.2f}" if value else "0.00")
+            row.append(f"{float(device['TotalIssued']):.2f}")
             device_details.append(row)
-            
+        
         # Calculate column widths based on number of columns
-        total_width = 7.8  # Total width in inches (increased slightly)
-        device_id_width = 1.3  # Slightly reduced Device ID column
+        total_width = 7.8  # Total width in inches
+        device_id_width = 1.3  # Device ID column width
         remaining_width = total_width - device_id_width
         month_width = remaining_width / (len(months) + 1)  # +1 for Total column
         col_widths = [device_id_width] + [month_width] * (len(months) + 1)
         
         details_table = Table(device_details, colWidths=[w*inch for w in col_widths])
         details_table.setStyle(TableStyle([
-            ('GRID', (0, 0), (-1, -1), 0.5, colors.black),  # Thinner grid lines
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
             ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
-            ('PADDING', (0, 0), (-1, -1), 1),  # Minimal padding
-            ('FONTSIZE', (0, 0), (-1, -1), 5),  # Even smaller font size
-            ('ALIGN', (1, 0), (-1, -1), 'RIGHT'),  # Right align numeric columns
-            ('TOPPADDING', (0, 0), (-1, -1), 0),  # No top padding
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 0),  # No bottom padding
-            ('LEFTPADDING', (0, 0), (-1, -1), 2),  # Minimal left padding
-            ('RIGHTPADDING', (0, 0), (-1, -1), 2),  # Minimal right padding
+            ('PADDING', (0, 0), (-1, -1), 1),
+            ('FONTSIZE', (0, 0), (-1, -1), 5),
+            ('ALIGN', (1, 0), (-1, -1), 'RIGHT'),
+            ('TOPPADDING', (0, 0), (-1, -1), 0),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 0),
+            ('LEFTPADDING', (0, 0), (-1, -1), 2),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 2),
         ]))
         elements.append(details_table)
         
@@ -912,7 +914,8 @@ class PartialIssueModal(QDialog):
             for i, value in enumerate(data['issue_process']):
                 # Convert value to Decimal
                 decimal_value = Decimal(str(value))
-                checkbox = QCheckBox(f"Value {i+1} ({decimal_value:.4f})")
+                # Change "Value X" to "Issue X"
+                checkbox = QCheckBox(f"Issue {i+1} ({decimal_value:.4f})")
                 checkbox.setProperty('value', decimal_value)
                 checkbox.setProperty('row', row)
                 checkbox.setProperty('is_default', False)
