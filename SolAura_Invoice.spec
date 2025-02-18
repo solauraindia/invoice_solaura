@@ -30,7 +30,7 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
-    name='SolAura_Invoice',
+    name='SolAura_Invoice_v1.1.0',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

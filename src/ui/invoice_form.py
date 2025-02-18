@@ -115,14 +115,14 @@ class InvoiceForm(QWidget):
         
         # Unit Sale Price
         self.unit_price_spin = QDoubleSpinBox()
-        self.unit_price_spin.setMaximum(999999.99)
-        self.unit_price_spin.setDecimals(2)
+        self.unit_price_spin.setMaximum(999999.9999)
+        self.unit_price_spin.setDecimals(4)
         form_layout.addRow('Unit Sale Price (USD):', self.unit_price_spin)
         
         # Success Fee
         self.success_fee_spin = QDoubleSpinBox()
-        self.success_fee_spin.setMaximum(100.0)
-        self.success_fee_spin.setDecimals(2)
+        self.success_fee_spin.setMaximum(100.0000)
+        self.success_fee_spin.setDecimals(4)
         form_layout.addRow('Success Fee (%):', self.success_fee_spin)
         
         # Exchange Rates
